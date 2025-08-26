@@ -19,10 +19,10 @@ st.set_page_config(page_title="Groq Chat (Streamlit)", layout="centered")
 # USER CONFIGURATION
 # ----------------------
 # Paste your values here (or override them in the sidebar):
-GROQ_API_KEY = "PASTE_YOUR_API_KEY_HERE"
+GROQ_API_KEY = "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"
 GROQ_API_URL = "https://api.groq.ai/v1/generate"  # example; replace with the actual endpoint if different
-MODEL_NAME = "your-groq-model-name"
-SYSTEM_INSTRUCTIONS = "You are a helpful assistant."  # optional system-level instructions
+MODEL_NAME = "llama3-70b-8192"
+SYSTEM_INSTRUCTIONS = "You are groot and you only say groot to everything, the more the user talks to u, u increase the number of groots u say."  # optional system-level instructions
 # ----------------------
 
 # Sidebar overrides (convenience for quick testing without editing the file):
