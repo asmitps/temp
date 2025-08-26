@@ -1,9 +1,9 @@
 """
-Simple Streamlit chat UI to talk to a Groq-hosted model.
+Simple Streamlit chat UI to talk to a Groq-hosted model (OpenAI-compatible).
 
 INSTRUCTIONS:
-- Paste your API key, model name and any instructions into the variables below.
-- If Groq's API expects a different request shape, adapt the payload construction in `call_model` accordingly.
+- Paste your API key and model name into the variables below.
+- This client sends OpenAI-style chat requests to Groq's OpenAI-compatible endpoint.
 
 This file is intentionally single-file and minimal: an input box, a send button, and a scrollable output area.
 """
@@ -21,9 +21,10 @@ st.set_page_config(page_title="Groq Chat (Streamlit)", layout="centered")
 # ----------------------
 # Paste your values here:
 GROQ_API_KEY = "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"
-GROQ_API_URL = "https://api.groq.com/openai/v1"  # example; replace with the actual endpoint if different
+# Groq's OpenAI-compatible base. Using the chat completions path for chat-style requests.
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_NAME = "llama3-70b-8192"
-SYSTEM_INSTRUCTIONS = "you are groot and u only say groot, and the more the user talks, the more groots u say."  # optional system-level instructions
+SYSTEM_INSTRUCTIONS = "ou are groot and u only say groot, and the more the user talks, the more groots u say."  # optional system-level instructions
 # ----------------------
 
 # For production, consider using an environment variable instead of embedding secrets in code:
@@ -47,29 +48,28 @@ def append_message(role: str, content: str) -> None:
 
 
 def extract_text_from_response(rjson: Any) -> str:
-    """Try several common patterns used by LLM APIs to extract assistant text.
-    This makes the client robust to minor differences in reply shape.
+    """Extract assistant text from OpenAI-style responses and a few common alternatives.
     """
     try:
         if isinstance(rjson, dict):
-            # common: {"output": "..."} or {"result": "..."}
-            for key in ('output', 'result', 'response', 'generated_text', 'text'):
-                if key in rjson and rjson[key]:
-                    return rjson[key] if isinstance(rjson[key], str) else json.dumps(rjson[key])
-
-            # common: {"choices": [{"message": {"content": "..."}}]} or {"choices":[{"text":"..."}]}
+            # OpenAI-style: {"choices": [{"message": {"content": "..."}}]}
             if 'choices' in rjson and isinstance(rjson['choices'], list) and len(rjson['choices']) > 0:
                 choice = rjson['choices'][0]
-                # nested message style
                 if isinstance(choice, dict):
+                    # nested message style
                     if 'message' in choice and isinstance(choice['message'], dict):
                         msg = choice['message']
-                        for k in ('content', 'text'):
-                            if k in msg:
-                                return msg[k]
+                        if 'content' in msg:
+                            return msg['content']
+                    # fallback: {"choices":[{"text":"..."}]}
                     for k in ('text', 'content', 'output'):
                         if k in choice:
                             return choice[k]
+
+            # other common top-level keys
+            for key in ('output', 'result', 'response', 'generated_text', 'text'):
+                if key in rjson and rjson[key]:
+                    return rjson[key] if isinstance(rjson[key], str) else json.dumps(rjson[key])
 
         # fallback: stringify
         return json.dumps(rjson)
@@ -77,24 +77,20 @@ def extract_text_from_response(rjson: Any) -> str:
         return f"<error extracting text: {e}>"
 
 
-def call_model(api_url: str, api_key: str, model: str, messages: List[Dict[str, str]], instructions: str = None, timeout: int = 60) -> str:
-    """Send messages to the LLM provider and return assistant text.
-    NOTE: The request body below is a best-effort template. Adapt this to Groq's exact schema if needed.
+def call_model(api_url: str, api_key: str, model: str, messages: List[Dict[str, str]], timeout: int = 60) -> str:
+    """Send OpenAI-compatible chat completion requests to Groq and return assistant text.
+
+    Payload conforms to OpenAI's `chat/completions` shape: {model, messages}.
     """
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json'
     }
 
-    # Construct a simple payload that many LLM endpoints accept.
     payload = {
         'model': model,
-        # Provide messages in a chat-style shape. Many APIs accept 'messages' or an 'input' string.
-        'messages': messages,
+        'messages': messages
     }
-    if instructions:
-        # include system/instructions field if desired by the provider
-        payload['instructions'] = instructions
 
     try:
         resp = requests.post(api_url, headers=headers, json=payload, timeout=timeout)
@@ -102,7 +98,6 @@ def call_model(api_url: str, api_key: str, model: str, messages: List[Dict[str, 
         return f"Request error: {e}"
 
     if resp.status_code != 200:
-        # try to include response body for debugging
         try:
             return f"Error {resp.status_code}: {resp.text}"
         except Exception:
@@ -130,7 +125,7 @@ with st.form(key='msg_form'):
 if submit and user_input.strip():
     append_message('user', user_input.strip())
 
-    # prepare chat-style messages (start with an optional system role)
+    # prepare messages in OpenAI chat format
     messages = []
     if INSTRUCTIONS:
         messages.append({'role': 'system', 'content': INSTRUCTIONS})
@@ -140,7 +135,7 @@ if submit and user_input.strip():
 
     # call model
     with st.spinner('Querying model...'):
-        assistant_text = call_model(API_URL, API_KEY, MODEL, messages, instructions=INSTRUCTIONS)
+        assistant_text = call_model(API_URL, API_KEY, MODEL, messages)
 
     append_message('assistant', assistant_text)
 
@@ -162,4 +157,4 @@ if st.button('Clear chat history'):
     st.experimental_rerun()
 
 # Small footer
-st.caption("Notes: adapt `API_URL` and payload in call_model(...) if Groq expects a different request shape.")
+st.caption("Notes: this uses Groq's OpenAI-compatible chat/completions endpoint. Replace the API key and model at the top of the file.")
