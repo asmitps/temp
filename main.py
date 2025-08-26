@@ -2,7 +2,7 @@
 Simple Streamlit chat UI to talk to a Groq-hosted model.
 
 INSTRUCTIONS:
-- Paste your API key, model name and any instructions into the variables below (or use the sidebar override).
+- Paste your API key, model name and any instructions into the variables below.
 - If Groq's API expects a different request shape, adapt the payload construction in `call_model` accordingly.
 
 This file is intentionally single-file and minimal: an input box, a send button, and a scrollable output area.
@@ -12,32 +12,27 @@ import streamlit as st
 import requests
 import json
 from typing import List, Dict, Any
+import os
 
 st.set_page_config(page_title="Groq Chat (Streamlit)", layout="centered")
 
 # ----------------------
 # USER CONFIGURATION
 # ----------------------
-# Paste your values here (or override them in the sidebar):
+# Paste your values here:
 GROQ_API_KEY = "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"
-GROQ_API_URL = "https://api.groq.ai/v1/generate"  # example; replace with the actual endpoint if different
+GROQ_API_URL = "https://api.groq.com/openai/v1"  # example; replace with the actual endpoint if different
 MODEL_NAME = "llama3-70b-8192"
-SYSTEM_INSTRUCTIONS = "You are groot and you only say groot to everything, the more the user talks to u, u increase the number of groots u say."  # optional system-level instructions
+SYSTEM_INSTRUCTIONS = "you are groot and u only say groot, and the more the user talks, the more groots u say."  # optional system-level instructions
 # ----------------------
 
-# Sidebar overrides (convenience for quick testing without editing the file):
-st.sidebar.header("Configuration (overrides)")
-api_key_input = st.sidebar.text_input("API Key", value=GROQ_API_KEY, type="password")
-api_url_input = st.sidebar.text_input("API URL", value=GROQ_API_URL)
-model_input = st.sidebar.text_input("Model name", value=MODEL_NAME)
-instructions_input = st.sidebar.text_area("System instructions", value=SYSTEM_INSTRUCTIONS, height=120)
+# For production, consider using an environment variable instead of embedding secrets in code:
+# GROQ_API_KEY = os.environ.get('GROQ_API_KEY', 'PASTE_YOUR_API_KEY_HERE')
 
-USE_SIDEBAR = st.sidebar.checkbox("Use sidebar values (recommended)", value=True)
-
-API_KEY = api_key_input if USE_SIDEBAR else GROQ_API_KEY
-API_URL = api_url_input if USE_SIDEBAR else GROQ_API_URL
-MODEL = model_input if USE_SIDEBAR else MODEL_NAME
-INSTRUCTIONS = instructions_input if USE_SIDEBAR else SYSTEM_INSTRUCTIONS
+API_KEY = GROQ_API_KEY
+API_URL = GROQ_API_URL
+MODEL = MODEL_NAME
+INSTRUCTIONS = SYSTEM_INSTRUCTIONS
 
 # ----------------------
 # Helper utilities
@@ -127,6 +122,7 @@ def call_model(api_url: str, api_key: str, model: str, messages: List[Dict[str, 
 st.title("Groq Chat — minimal Streamlit UI")
 st.write("A minimal chat interface. Enter a message and press Send.")
 
+# Input form
 with st.form(key='msg_form'):
     user_input = st.text_area("Message", value="", height=120)
     submit = st.form_submit_button("Send")
@@ -140,7 +136,6 @@ if submit and user_input.strip():
         messages.append({'role': 'system', 'content': INSTRUCTIONS})
     # include previous history to give context (alternatively, send only the last user message)
     for item in st.session_state.history:
-        # only include last N messages if you want to limit size
         messages.append({'role': item['role'], 'content': item['content']})
 
     # call model
@@ -161,8 +156,8 @@ for item in st.session_state.history:
     elif role == 'system':
         st.markdown(f"**System:** {content}")
 
-# Clear history button
-if st.sidebar.button('Clear chat history'):
+# Clear history button in main UI
+if st.button('Clear chat history'):
     st.session_state.history = []
     st.experimental_rerun()
 
